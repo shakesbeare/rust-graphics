@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use wgpu::{util::DeviceExt, BufferUsages};
 use winit::{
+    dpi::{LogicalSize, PhysicalSize, Size},
     event::{Event, WindowEvent},
     event_loop::EventLoop,
     window::Window,
@@ -33,17 +34,27 @@ impl Vertex {
 
 const VERTICES: &[Vertex] = &[
     Vertex {
-        position: [0.0, 0.5, 0.0, 1.0],
+        position: [-0.5, 0.5, 0.0, 1.0],
         color: [1.0, 0.0, 0.0, 1.0],
     },
     Vertex {
         position: [-0.5, -0.5, 0.0, 1.0],
-        color: [0.0, 1.0, 0.0, 1.0],
+        color: [1.0, 0.0, 0.0, 1.0],
     },
     Vertex {
         position: [0.5, -0.5, 0.0, 1.0],
-        color: [0.0, 0.0, 1.0, 1.0],
+        color: [1.0, 0.0, 0.0, 1.0],
     },
+    Vertex {
+        position: [0.5, 0.5, 0.0, 1.0],
+        color: [1.0, 0.0, 0.0, 1.0],
+    },
+];
+
+
+const INDICES: &[u16] = &[
+    0, 1, 2,
+    2, 3, 0
 ];
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
@@ -110,12 +121,19 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             multiview: None,
         });
 
-    let position_buffer =
+    let vertex_buf =
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
+            label: Some("Vertex Buffer"),
             contents: bytemuck::cast_slice(VERTICES),
             usage: BufferUsages::VERTEX,
         });
+
+    let index_buf =
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+        label: Some("Index Buffer"),
+        contents: bytemuck::cast_slice(INDICES),
+        usage: wgpu::BufferUsages::INDEX,
+    });
 
     let mut config = surface
         .get_default_config(&adapter, size.width, size.height)
@@ -149,7 +167,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         );
 
                         {
-                            let mut rpass = encoder.begin_render_pass(
+                            let mut render_pass = encoder.begin_render_pass(
                                 &wgpu::RenderPassDescriptor {
                                     label: None,
                                     color_attachments: &[Some(
@@ -170,9 +188,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                                 },
                             );
 
-                            rpass.set_pipeline(&render_pipeline);
-                            rpass.set_vertex_buffer(0, position_buffer.slice(..));
-                            rpass.draw(0..3, 0..1);
+                            render_pass.set_pipeline(&render_pipeline);
+                            render_pass.set_vertex_buffer(0, vertex_buf.slice(..));
+                            render_pass.set_index_buffer(index_buf.slice(..), wgpu::IndexFormat::Uint16);
+                            render_pass.draw_indexed(0..6, 0, 0..1);
                         }
 
                         queue.submit(Some(encoder.finish()));
@@ -190,7 +209,14 @@ fn main() {
     let event_loop = EventLoop::new().unwrap();
     #[allow(unused_mut)]
     let mut builder = winit::window::WindowBuilder::new();
-    let window = builder.build(&event_loop).unwrap();
+    let window = builder
+        .with_resizable(false)
+        .with_inner_size(Size::Logical(LogicalSize {
+            width: 600.0,
+            height: 600.0,
+        }))
+        .build(&event_loop)
+        .unwrap();
 
     env_logger::init();
     pollster::block_on(run(event_loop, window));
