@@ -1,8 +1,11 @@
 pub mod texture;
+pub mod camera;
 
-use std::borrow::Cow;
+use std::{borrow::Cow, time::{Duration, Instant}};
+use bevy_input::ButtonInput;
+use camera::{Camera, Projection};
 use wgpu::util::DeviceExt;
-use winit::{event::WindowEvent, window::Window};
+use winit::{event::WindowEvent, keyboard::KeyCode, window::Window};
 
 const VERTICES: &[Vertex] = &[
     // top (0, 0, 1)
@@ -144,7 +147,7 @@ impl Vertex {
     }
 }
 
-pub struct Graphics<'a, P: Projection> {
+pub struct State<'a, P: Projection> {
     instance: wgpu::Instance,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -159,9 +162,13 @@ pub struct Graphics<'a, P: Projection> {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     depth_texture: texture::Texture,
+    pub input: ButtonInput<KeyCode>,
+    pub time: Duration,
+    pub last_frame: Instant,
+    pub delta_time: f32,
 }
 
-impl<'a, P: Projection> Graphics<'a, P> {
+impl<'a, P: Projection> State<'a, P> {
     pub async fn new(window: Window, projection_type: P) -> Self {
         let size = window.inner_size();
 
@@ -302,6 +309,8 @@ impl<'a, P: Projection> Graphics<'a, P> {
                 multiview: None,
             });
 
+        let input = ButtonInput::default();
+
         Self {
             instance,
             device,
@@ -317,6 +326,10 @@ impl<'a, P: Projection> Graphics<'a, P> {
             vertex_buffer,
             index_buffer,
             depth_texture,
+            input,
+            time: Duration::from_secs(0),
+            last_frame: Instant::now(),
+            delta_time: 0.0,
         }
     }
 
@@ -346,10 +359,6 @@ impl<'a, P: Projection> Graphics<'a, P> {
         self.window.request_redraw();
     }
 
-    pub fn input(&mut self, event: &WindowEvent) -> bool {
-        false
-    }
-
     pub fn update(&mut self) {
         let mx_total = self.camera.projection_matrix();
         let mx_ref: &[f32; 16] = mx_total.as_ref();
@@ -359,6 +368,12 @@ impl<'a, P: Projection> Graphics<'a, P> {
             0,
             bytemuck::cast_slice(mx_ref),
         );
+
+        let delta_time = self.last_frame.elapsed();
+        self.time += delta_time;
+        self.last_frame = Instant::now();
+        let delta_time_float = delta_time.as_secs() as f32 + delta_time.subsec_millis() as f32 / 1000.0;
+        self.delta_time = delta_time_float;
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -416,90 +431,3 @@ impl<'a, P: Projection> Graphics<'a, P> {
     }
 }
 
-pub trait Projection {
-    fn generate_view_projection_matrix(
-        aspect_ratio: f32,
-        eye: glam::Vec3,
-        up: glam::Vec3,
-        fov: f32,
-        target: glam::Vec3,
-        z_near: f32,
-        z_far: f32,
-    ) -> glam::Mat4;
-}
-
-pub struct Orthographic;
-
-impl Projection for Orthographic {
-    fn generate_view_projection_matrix(
-        aspect_ratio: f32,
-        eye: glam::Vec3,
-        up: glam::Vec3,
-        fov: f32,
-        target: glam::Vec3,
-        z_near: f32,
-        z_far: f32,
-    ) -> glam::Mat4 {
-        let projection =
-            glam::Mat4::orthographic_rh(-fov, fov, -fov, fov, z_near, z_far);
-        let view = glam::Mat4::look_to_rh(eye, target, up);
-        return projection * view;
-    }
-}
-
-pub struct Perspective;
-
-impl Projection for Perspective {
-    fn generate_view_projection_matrix(
-        aspect_ratio: f32,
-        eye: glam::Vec3,
-        up: glam::Vec3,
-        fov: f32,
-        target: glam::Vec3,
-        z_near: f32,
-        z_far: f32,
-    ) -> glam::Mat4 {
-        let projection = glam::Mat4::perspective_rh(fov, aspect_ratio, z_near, z_far);
-        let view = glam::Mat4::look_to_rh(eye, target, up);
-        return projection * view;
-    }
-}
-
-pub struct Camera<P: Projection> {
-    #[allow(unused)]
-    proj: P,
-    pub eye: glam::Vec3,
-    pub up: glam::Vec3,
-    aspect_ratio: f32,
-    pub target: glam::Vec3,
-    fov: f32,
-    z_near: f32,
-    z_far: f32,
-}
-
-impl<P: Projection> Camera<P> {
-    pub fn new(fov_degrees: f32, aspect_ratio: f32, projection_type: P) -> Self {
-        let eye = glam::Vec3::new(3.75, 1.675, 3.75);
-        Camera {
-            proj: projection_type,
-            eye,
-            target: -eye, // always look at origin
-            up: glam::Vec3::Y,
-            aspect_ratio,
-            fov: fov_degrees.to_radians(),
-            z_near: 0.1,
-            z_far: 1000.0,
-        }
-    }
-    pub fn projection_matrix(&self) -> glam::Mat4 {
-        P::generate_view_projection_matrix(
-            self.aspect_ratio,
-            self.eye,
-            self.up,
-            self.fov,
-            self.target,
-            self.z_near,
-            self.z_far,
-        )
-    }
-}

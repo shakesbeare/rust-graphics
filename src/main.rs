@@ -1,77 +1,122 @@
-use rust_graphics::{Graphics, Orthographic, Perspective};
+use rust_graphics::camera::{Perspective, Projection};
+use rust_graphics::State;
 use winit::{
     dpi::{LogicalSize, Size},
     event::{Event, WindowEvent},
-    event_loop::EventLoop,
+    event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
     keyboard::{KeyCode, PhysicalKey},
     window::Window,
 };
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
-    let mut graphics = Graphics::new(window, Perspective).await;
+    let mut state = State::new(window, Perspective).await;
+    event_loop.set_control_flow(ControlFlow::Poll);
     event_loop
         .run(move |event, target| {
-            let _ = &mut graphics;
-            if let Event::WindowEvent {
-                window_id: _,
-                event,
-            } = event
-            {
-                match event {
-                    WindowEvent::Resized(new_size) => {
-                        log::debug!("Resized to: {:?}", new_size);
-                        graphics.resize(new_size);
-                    }
-                    WindowEvent::RedrawRequested => {
-                        graphics.update();
-                        match graphics.render() {
-                            Ok(_) => {}
-                            Err(wgpu::SurfaceError::Lost) => {
-                                log::error!("surface error: lost");
-                                graphics.resize(graphics.size)
-                            }
-                            Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
-                            Err(e) => eprintln!("{e:?}"),
-                        }
-                    }
-                    WindowEvent::KeyboardInput { event, .. } => {
-                        let key = event.physical_key;
-                        let cam_speed = 1.0;
-                        match event.state {
-                            winit::event::ElementState::Pressed => {
-                                let forward =
-                                    graphics.camera.target - graphics.camera.eye;
-                                let forward_norm = forward.normalize();
-                                let forward_mag = forward.length();
-                                if key == PhysicalKey::Code(KeyCode::Escape) {
-                                    target.exit();
-                                } else if key == PhysicalKey::Code(KeyCode::ArrowUp) {
-                                    graphics.camera.eye += forward_norm * cam_speed;
-                                } else if key == PhysicalKey::Code(KeyCode::ArrowDown) {
-                                    graphics.camera.eye -= forward_norm * cam_speed;
-                                } else if key == PhysicalKey::Code(KeyCode::ArrowRight)
-                                {
-                                    let right = forward_norm.cross(graphics.camera.up);
-                                    graphics.camera.eye = graphics.camera.target
-                                        - (forward + right * cam_speed).normalize()
-                                            * forward_mag;
-                                } else if key == PhysicalKey::Code(KeyCode::ArrowLeft) {
-                                    let right = forward_norm.cross(graphics.camera.up);
-                                    graphics.camera.eye = graphics.camera.target
-                                        - (forward - right * cam_speed).normalize()
-                                            * forward_mag;
-                                }
-                            }
-                            winit::event::ElementState::Released => {}
-                        }
-                        graphics.window().request_redraw();
-                    }
-                    WindowEvent::CloseRequested => target.exit(),
-                    _ => {}
-                }
-            }
+            // main event loop
+            event_handler(event, target, &mut state);
+            update(&mut state);
         })
         .unwrap();
+}
+
+fn update<P>(state: &mut State<P>)
+where
+    P: Projection,
+{
+    state.update();
+
+    let input = &state.input;
+    let mut move_vec = glam::Vec3::splat(0.0);
+    let move_speed = 5.0;
+    if input.pressed(KeyCode::ArrowLeft) {
+        move_vec.x -= move_speed;
+    }
+
+    if input.pressed(KeyCode::ArrowRight) {
+        move_vec.x += move_speed;
+    }
+
+    if input.pressed(KeyCode::ArrowUp) {
+        move_vec.z -= move_speed;
+    }
+
+    if input.pressed(KeyCode::ArrowDown) {
+        move_vec.z += move_speed;
+    }
+
+    if input.pressed(KeyCode::Space) {
+        move_vec.y += move_speed;
+    }
+
+    if input.pressed(KeyCode::ShiftLeft) {
+        move_vec.y -= move_speed;
+    }
+
+    let local_x_axis = state.camera.dir.cross(state.camera.up).normalize();
+    let local_z_axis = -state.camera.dir.normalize();
+    let move_vec = move_vec.x * local_x_axis
+        + move_vec.z * local_z_axis
+        + move_vec.y * state.camera.up.normalize();
+
+    let new_location = state.camera.location + move_vec * state.delta_time;
+    state.camera.move_camera(new_location);
+
+    state.window().request_redraw();
+}
+
+fn event_handler<P>(
+    event: Event<()>,
+    target: &EventLoopWindowTarget<()>,
+    state: &mut State<P>,
+) where
+    P: Projection,
+{
+    if let Event::WindowEvent {
+        window_id: _,
+        event,
+    } = event
+    {
+        match event {
+            WindowEvent::Resized(new_size) => {
+                log::debug!("Resized to: {:?}", new_size);
+                state.resize(new_size);
+            }
+            WindowEvent::RedrawRequested => {
+                // point camera at origin
+                // state.camera.point_at(glam::Vec3::splat(0.0));
+                state.update();
+                match state.render() {
+                    Ok(_) => {}
+                    Err(wgpu::SurfaceError::Lost) => {
+                        log::error!("surface error: lost");
+                        state.resize(state.size)
+                    }
+                    Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
+                    Err(e) => eprintln!("{e:?}"),
+                }
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                match event.state {
+                    winit::event::ElementState::Pressed => {
+                        let PhysicalKey::Code(key) = event.physical_key else {
+                            unreachable!();
+                        };
+                        state.input.press(key);
+                    }
+                    winit::event::ElementState::Released => {
+                        let PhysicalKey::Code(key) = event.physical_key else {
+                            unreachable!();
+                        };
+                        state.input.release(key);
+                    }
+                }
+                state.window().request_redraw();
+            }
+            WindowEvent::CloseRequested => target.exit(),
+            _ => {}
+        }
+    }
 }
 
 fn main() {
