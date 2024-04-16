@@ -221,17 +221,12 @@ impl<'a, P: Projection> Graphics<'a, P> {
 
         let camera = Camera::new(
             45.0,
-            config.width as f32,
-            config.height as f32,
+            config.width as f32 / config.height as f32,
             projection_type,
         );
         {
             let cam = &camera;
             let proj = cam.projection_matrix();
-            for v in VERTICES {
-                let vec = glam::Vec4::from(v.position);
-                log::info!("{:?} x {:?} = ", vec, proj);
-            }
             log::info!("{proj:?}");
         }
 
@@ -483,24 +478,14 @@ pub struct Camera<P: Projection> {
 }
 
 impl<P: Projection> Camera<P> {
-    pub fn new(fov_degrees: f32, width: f32, height: f32, projection_type: P) -> Self {
-        let eye = glam::Vec3::new(1.35f32, -5.0, 10.0);
-        let target = glam::Vec3::new(0.0, 0.0, 0.0);
-        let forward = target - eye.normalize();
-        let a = 1.0;
-        let b = 1.0;
-        let c = (eye.x + eye.y) / 10.0;
-
-        let v = glam::Vec3::new(a, b, c);
-        let v_n = v.normalize();
-        let v_unit = v / v_n;
-
+    pub fn new(fov_degrees: f32, aspect_ratio: f32, projection_type: P) -> Self {
+        let eye = glam::Vec3::new(3.75, 1.675, 3.75);
         Camera {
             proj: projection_type,
-            eye: eye,
-            target: forward,
-            up: v_unit,
-            aspect_ratio: width / height,
+            eye,
+            target: -eye, // always look at origin
+            up: glam::Vec3::Y,
+            aspect_ratio,
             fov: fov_degrees.to_radians(),
             z_near: 0.1,
             z_far: 1000.0,

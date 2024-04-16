@@ -40,7 +40,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         match event.state {
                             winit::event::ElementState::Pressed => {
                                 let forward =
-                                    (graphics.camera.target - graphics.camera.eye);
+                                    graphics.camera.target - graphics.camera.eye;
                                 let forward_norm = forward.normalize();
                                 let forward_mag = forward.length();
                                 if key == PhysicalKey::Code(KeyCode::Escape) {
@@ -81,7 +81,7 @@ fn main() {
     let window = builder
         // .with_resizable(false)
         .with_inner_size(Size::Logical(LogicalSize {
-            width: 600.0,
+            width: 800.0,
             height: 600.0,
         }))
         .build(&event_loop)
