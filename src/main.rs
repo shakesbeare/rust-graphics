@@ -45,11 +45,11 @@ where
         move_vec.z += move_speed;
     }
 
-    if input.pressed(KeyCode::Space) {
+    if input.pressed(KeyCode::KeyQ) {
         move_vec.y += move_speed;
     }
 
-    if input.pressed(KeyCode::ShiftLeft) {
+    if input.pressed(KeyCode::KeyE) {
         move_vec.y -= move_speed;
     }
 
@@ -61,6 +61,11 @@ where
 
     let new_location = state.camera.location + move_vec * state.delta_time;
     state.camera.move_camera(new_location);
+
+    let rot = 30.0_f32.to_radians() * state.delta_time;
+    let cube_rotate = glam::Quat::from_euler(glam::EulerRot::XYZ, rot, rot, 0.0);
+    state.mesh.transform.rotation = state.mesh.transform.rotation.mul_quat(cube_rotate);
+
 
     state.window().request_redraw();
 }

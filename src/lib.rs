@@ -1,9 +1,15 @@
-pub mod texture;
 pub mod camera;
+pub mod mesh;
+pub mod texture;
+pub mod transform;
 
-use std::{borrow::Cow, time::{Duration, Instant}};
 use bevy_input::ButtonInput;
 use camera::{Camera, Projection};
+use mesh::Mesh;
+use std::{
+    borrow::Cow,
+    time::{Duration, Instant},
+};
 use wgpu::util::DeviceExt;
 use winit::{event::WindowEvent, keyboard::KeyCode, window::Window};
 
@@ -166,6 +172,7 @@ pub struct State<'a, P: Projection> {
     pub time: Duration,
     pub last_frame: Instant,
     pub delta_time: f32,
+    pub mesh: Mesh<'a>,
 }
 
 impl<'a, P: Projection> State<'a, P> {
@@ -208,11 +215,13 @@ impl<'a, P: Projection> State<'a, P> {
             ))),
         });
 
+        let mesh = Mesh::new(VERTICES, INDICES);
+
         let vertex_buffer =
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Vertex Buffer"),
-                contents: bytemuck::cast_slice(VERTICES),
-                usage: wgpu::BufferUsages::VERTEX,
+                contents: bytemuck::cast_slice(&mesh.vertices_transformed()),
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             });
 
         let index_buffer =
@@ -330,6 +339,7 @@ impl<'a, P: Projection> State<'a, P> {
             time: Duration::from_secs(0),
             last_frame: Instant::now(),
             delta_time: 0.0,
+            mesh,
         }
     }
 
@@ -369,10 +379,17 @@ impl<'a, P: Projection> State<'a, P> {
             bytemuck::cast_slice(mx_ref),
         );
 
+        self.queue.write_buffer(
+            &self.vertex_buffer,
+            0,
+            bytemuck::cast_slice(&self.mesh.vertices_transformed()),
+        );
+
         let delta_time = self.last_frame.elapsed();
         self.time += delta_time;
         self.last_frame = Instant::now();
-        let delta_time_float = delta_time.as_secs() as f32 + delta_time.subsec_millis() as f32 / 1000.0;
+        let delta_time_float =
+            delta_time.as_secs() as f32 + delta_time.subsec_millis() as f32 / 1000.0;
         self.delta_time = delta_time_float;
     }
 
@@ -430,4 +447,3 @@ impl<'a, P: Projection> State<'a, P> {
         Ok(())
     }
 }
-
