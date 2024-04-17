@@ -6,6 +6,7 @@ pub mod transform;
 use bevy_input::ButtonInput;
 use camera::{Camera, Projection};
 use mesh::Mesh;
+use transform::Transform;
 use std::{
     borrow::Cow,
     time::{Duration, Instant},
@@ -168,7 +169,8 @@ pub struct State<'a, P: Projection> {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     depth_texture: texture::Texture,
-    pub input: ButtonInput<KeyCode>,
+    pub button_input: ButtonInput<KeyCode>,
+    pub mouse_motion: glam::Vec2,
     pub time: Duration,
     pub last_frame: Instant,
     pub delta_time: f32,
@@ -239,6 +241,7 @@ impl<'a, P: Projection> State<'a, P> {
             45.0,
             config.width as f32 / config.height as f32,
             projection_type,
+            Transform::from_translation(glam::Vec3::new(0.0, 0.0, 0.0)),
         );
         {
             let cam = &camera;
@@ -335,7 +338,8 @@ impl<'a, P: Projection> State<'a, P> {
             vertex_buffer,
             index_buffer,
             depth_texture,
-            input,
+            button_input: input,
+            mouse_motion: glam::Vec2::splat(0.0),
             time: Duration::from_secs(0),
             last_frame: Instant::now(),
             delta_time: 0.0,

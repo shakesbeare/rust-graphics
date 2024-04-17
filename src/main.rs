@@ -1,5 +1,6 @@
 use rust_graphics::camera::{Perspective, Projection};
 use rust_graphics::State;
+use winit::event::DeviceEvent;
 use winit::{
     dpi::{LogicalSize, Size},
     event::{Event, WindowEvent},
@@ -9,6 +10,10 @@ use winit::{
 };
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
+    window
+        .set_cursor_grab(winit::window::CursorGrabMode::Locked)
+        .unwrap();
+    window.set_cursor_visible(false);
     let mut state = State::new(window, Perspective).await;
     event_loop.set_control_flow(ControlFlow::Poll);
     event_loop
@@ -26,46 +31,57 @@ where
 {
     state.update();
 
-    let input = &state.input;
-    let mut move_vec = glam::Vec3::splat(0.0);
-    let move_speed = 5.0;
-    if input.pressed(KeyCode::ArrowLeft) {
-        move_vec.x -= move_speed;
+    {
+        let input = &state.button_input;
+        let mut move_vec = glam::Vec3::splat(0.0);
+        let move_speed = 5.0;
+        if input.pressed(KeyCode::ArrowLeft) || input.pressed(KeyCode::KeyA) {
+            move_vec.x -= move_speed;
+        }
+
+        if input.pressed(KeyCode::ArrowRight) || input.pressed(KeyCode::KeyD) {
+            move_vec.x += move_speed;
+        }
+
+        if input.pressed(KeyCode::ArrowUp) || input.pressed(KeyCode::KeyW) {
+            move_vec.z += move_speed;
+        }
+
+        if input.pressed(KeyCode::ArrowDown) || input.pressed(KeyCode::KeyS) {
+            move_vec.z -= move_speed;
+        }
+
+        if input.pressed(KeyCode::KeyQ) {
+            move_vec.y += move_speed;
+        }
+
+        if input.pressed(KeyCode::KeyE) {
+            move_vec.y -= move_speed;
+        }
+
+
+
+        let local_x_axis = state.camera.right();
+        let local_z_axis = state.camera.forward();
+        let move_vec = move_vec.x * local_x_axis
+            + move_vec.z * local_z_axis
+            + move_vec.y * state.camera.up();
+
+        log::info!("{}, {}", local_z_axis, move_vec);
+        state.camera.translate(move_vec * state.delta_time);
     }
 
-    if input.pressed(KeyCode::ArrowRight) {
-        move_vec.x += move_speed;
+    {
+        let mouse_motion = &mut state.mouse_motion;
+        let sensitivity = 0.05;
+        state.camera.pitch += mouse_motion.y.to_radians() * sensitivity;
+        state.camera.yaw -= mouse_motion.x.to_radians() * sensitivity;
+        *mouse_motion = glam::Vec2::splat(0.0);
     }
-
-    if input.pressed(KeyCode::ArrowUp) {
-        move_vec.z -= move_speed;
-    }
-
-    if input.pressed(KeyCode::ArrowDown) {
-        move_vec.z += move_speed;
-    }
-
-    if input.pressed(KeyCode::KeyQ) {
-        move_vec.y += move_speed;
-    }
-
-    if input.pressed(KeyCode::KeyE) {
-        move_vec.y -= move_speed;
-    }
-
-    let local_x_axis = state.camera.dir.cross(state.camera.up).normalize();
-    let local_z_axis = -state.camera.dir.normalize();
-    let move_vec = move_vec.x * local_x_axis
-        + move_vec.z * local_z_axis
-        + move_vec.y * state.camera.up.normalize();
-
-    let new_location = state.camera.location + move_vec * state.delta_time;
-    state.camera.move_camera(new_location);
 
     let rot = 30.0_f32.to_radians() * state.delta_time;
-    let cube_rotate = glam::Quat::from_euler(glam::EulerRot::XYZ, rot, rot, 0.0);
+    let cube_rotate = glam::Quat::from_euler(glam::EulerRot::XYZ, 0.0, rot, 0.0);
     state.mesh.transform.rotation = state.mesh.transform.rotation.mul_quat(cube_rotate);
-
 
     state.window().request_redraw();
 }
@@ -77,11 +93,15 @@ fn event_handler<P>(
 ) where
     P: Projection,
 {
-    if let Event::WindowEvent {
-        window_id: _,
-        event,
-    } = event
-    {
+    if let Event::DeviceEvent { event, .. } = &event {
+        match event {
+            DeviceEvent::MouseMotion { delta } => {
+                state.mouse_motion = (delta.0 as f32, delta.1 as f32).into();
+            }
+            _ => {}
+        }
+    }
+    if let Event::WindowEvent { event, .. } = event {
         match event {
             WindowEvent::Resized(new_size) => {
                 log::debug!("Resized to: {:?}", new_size);
@@ -107,13 +127,13 @@ fn event_handler<P>(
                         let PhysicalKey::Code(key) = event.physical_key else {
                             unreachable!();
                         };
-                        state.input.press(key);
+                        state.button_input.press(key);
                     }
                     winit::event::ElementState::Released => {
                         let PhysicalKey::Code(key) = event.physical_key else {
                             unreachable!();
                         };
-                        state.input.release(key);
+                        state.button_input.release(key);
                     }
                 }
                 state.window().request_redraw();

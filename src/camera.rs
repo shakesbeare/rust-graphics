@@ -1,50 +1,76 @@
+use crate::transform::Transform;
+
 pub struct Camera<P: Projection> {
     #[allow(unused)]
     proj: P,
-    pub location: glam::Vec3,
-    pub up: glam::Vec3,
+    pub transform: Transform,
+    pub pitch: f32,
+    pub yaw: f32,
     pub aspect_ratio: f32,
-    pub dir: glam::Vec3,
     fov: f32,
     z_near: f32,
     z_far: f32,
 }
 
 impl<P: Projection> Camera<P> {
-    pub fn new(fov_degrees: f32, aspect_ratio: f32, projection_type: P) -> Self {
-        let eye = glam::Vec3::new(3.75, 1.675, 3.75);
+    pub fn new(
+        fov_degrees: f32,
+        aspect_ratio: f32,
+        projection_type: P,
+        transform: Transform,
+    ) -> Self {
+        let dir = -transform.translation;
         Camera {
             proj: projection_type,
-            location: eye,
-            dir: -eye, // always look at origin
-            up: glam::Vec3::Y,
+            transform,
             aspect_ratio,
+            pitch: 0.0,
+            yaw: 0.0,
             fov: fov_degrees.to_radians(),
             z_near: 0.1,
             z_far: 1000.0,
         }
     }
 
-    pub fn move_camera(&mut self, location: glam::Vec3) {
-        self.location = location;
+    pub fn forward(&self) -> glam::Vec3 {
+        glam::Vec3::new(
+            self.pitch.cos() * self.yaw.sin(),
+            self.pitch.sin(),
+            self.pitch.cos() * self.yaw.cos(),
+        ).normalize()
     }
 
-    pub fn rotate_camera(&mut self, direction: glam::Vec3) {
-        self.dir = direction;
+    pub fn backward(&self) -> glam::Vec3 {
+        -self.forward()
     }
 
-    pub fn point_at(&mut self, target: glam::Vec3) {
-        let direction = target - self.location;
-        self.rotate_camera(direction);
+    pub fn right(&self) -> glam::Vec3 {
+        glam::Vec3::Y.cross(self.forward()).normalize()
+    }
+
+    pub fn left(&self) -> glam::Vec3 {
+        -self.right()
+    }
+
+    pub fn up(&self) -> glam::Vec3 {
+        glam::Vec3::Y
+    }
+
+    pub fn down(&self) -> glam::Vec3 {
+        glam::Vec3::NEG_Y
+    }
+
+    pub fn translate(&mut self, translation: glam::Vec3) {
+        self.transform.translation += translation;
     }
 
     pub fn projection_matrix(&self) -> glam::Mat4 {
         P::generate_view_projection_matrix(
             self.aspect_ratio,
-            self.location,
-            self.up,
+            self.transform.translation,
+            glam::Vec3::Y,
             self.fov,
-            self.dir,
+            self.forward(),
             self.z_near,
             self.z_far,
         )
@@ -99,4 +125,3 @@ impl Projection for Perspective {
         return projection * view;
     }
 }
-
