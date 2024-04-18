@@ -33,6 +33,7 @@ pub fn update() {
     }
 }
 
+/// Returns the elapsed time as a Duration since the program started
 pub fn total_elapsed() -> Duration {
     let Some(prog_start) = T_PROGRAM_START.get() else {
         log::debug!("T_PROGRAM_START was not initialized");
@@ -41,6 +42,7 @@ pub fn total_elapsed() -> Duration {
     prog_start.elapsed()
 }
 
+/// Returns the elapsed time in seconds since the last frame
 pub fn delta_time() -> f32 {
     let last_frame = T_LAST_FRAME.get().unwrap().read().unwrap();
     last_frame.elapsed().as_secs_f32()

@@ -3,7 +3,8 @@ use glam::Vec3;
 use rust_graphics::camera::{Camera, Perspective, Projection};
 use rust_graphics::mesh::Mesh;
 use rust_graphics::transform::Transform;
-use rust_graphics::{Input, render::Render};
+use rust_graphics::Entity;
+use rust_graphics::{render::Render, Input};
 use winit::event::DeviceEvent;
 use winit::{
     dpi::{LogicalSize, Size},
@@ -12,10 +13,12 @@ use winit::{
     keyboard::PhysicalKey,
     window::Window,
 };
+use rust_graphics::time;
 
 use ::anyhow::Result;
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
+    time::startup();
     window
         .set_cursor_grab(winit::window::CursorGrabMode::Locked)
         .unwrap();
@@ -29,18 +32,21 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         Perspective,
         Transform::from_translation(Vec3::new(0.0, 0.0, -10.0)),
     );
-    let meshes: Vec<Mesh> = vec![Mesh::from(
+    let mut meshes: Vec<Mesh> = vec![Mesh::from(
         std::env::current_dir().unwrap().join("assets/teapot.obj"),
     )];
 
     event_loop.set_control_flow(ControlFlow::Poll);
     event_loop
         .run(move |event, target| {
-            // main event loop
+            // Pre Update
             event_handler(event, target, &mut render, &mut input, &mut camera, &meshes);
 
-            update();
+            // Update
+            update(&mut meshes);
 
+            // Post Update
+            time::update();
             render.window().request_redraw();
         })
         .unwrap();
@@ -103,8 +109,10 @@ fn event_handler<P>(
     }
 }
 
-fn update() {
-
+fn update(entities: &mut [Mesh]) {
+    for entity in entities.iter_mut() {
+        entity.update();
+    }
 }
 
 fn main() -> Result<()> {

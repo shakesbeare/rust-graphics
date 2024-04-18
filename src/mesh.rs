@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use crate::time;
 
 use crate::{transform::Transform, vertex::Vertex};
 
@@ -72,5 +73,15 @@ impl From<PathBuf> for Mesh {
         let contents = std::fs::read_to_string(value).unwrap();
         let obj = obj::load_obj(contents.as_bytes()).unwrap();
         Mesh::from(obj)
+    }
+}
+
+impl crate::Entity for Mesh {
+    fn start(&mut self) {}
+
+    fn update(&mut self) {
+        let rot = 30.0_f32.to_radians() * time::delta_time();
+        let quat = glam::Quat::from_euler(glam::EulerRot::XYZ, 0.0, rot, 0.0);
+        self.transform.rotation *= quat;
     }
 }

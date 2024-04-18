@@ -29,3 +29,8 @@ impl Default for Input {
         Self::new()
     }
 }
+
+pub trait Entity {
+    fn start(&mut self);
+    fn update(&mut self);
+}

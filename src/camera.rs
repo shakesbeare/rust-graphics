@@ -125,3 +125,9 @@ impl Projection for Perspective {
         return projection * view;
     }
 }
+
+impl<P: Projection> crate::Entity for Camera<P> {
+    fn start(&mut self) {}
+
+    fn update(&mut self) {}
+}
