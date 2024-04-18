@@ -9,6 +9,8 @@ use winit::{
     window::Window,
 };
 
+use::anyhow::Result;
+
 async fn run(event_loop: EventLoop<()>, window: Window) {
     window
         .set_cursor_grab(winit::window::CursorGrabMode::Locked)
@@ -67,7 +69,6 @@ where
             + move_vec.z * local_z_axis
             + move_vec.y * state.camera.up();
 
-        log::info!("{}, {}", local_z_axis, move_vec);
         state.camera.translate(move_vec * state.delta_time);
     }
 
@@ -80,8 +81,8 @@ where
     }
 
     let rot = 30.0_f32.to_radians() * state.delta_time;
-    let cube_rotate = glam::Quat::from_euler(glam::EulerRot::XYZ, 0.0, rot, 0.0);
-    state.mesh.transform.rotation = state.mesh.transform.rotation.mul_quat(cube_rotate);
+    let mesh_rotate = glam::Quat::from_euler(glam::EulerRot::XYZ, 0.0, rot, 0.0);
+    state.mesh.transform.rotation = state.mesh.transform.rotation.mul_quat(mesh_rotate);
 
     state.window().request_redraw();
 }
@@ -144,12 +145,12 @@ fn event_handler<P>(
     }
 }
 
-fn main() {
+fn main() -> Result<()> {
     let event_loop = EventLoop::new().unwrap();
     #[allow(unused_mut)]
     let mut builder = winit::window::WindowBuilder::new();
     let window = builder
-        // .with_resizable(false)
+        .with_resizable(false)
         .with_inner_size(Size::Logical(LogicalSize {
             width: 800.0,
             height: 600.0,
@@ -159,4 +160,6 @@ fn main() {
 
     env_logger::init();
     pollster::block_on(run(event_loop, window));
+    
+    Ok(())
 }

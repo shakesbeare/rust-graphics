@@ -6,128 +6,14 @@ pub mod transform;
 use bevy_input::ButtonInput;
 use camera::{Camera, Projection};
 use mesh::Mesh;
-use transform::Transform;
 use std::{
     borrow::Cow,
+    path::PathBuf,
     time::{Duration, Instant},
 };
+use transform::Transform;
 use wgpu::util::DeviceExt;
 use winit::{event::WindowEvent, keyboard::KeyCode, window::Window};
-
-const VERTICES: &[Vertex] = &[
-    // top (0, 0, 1)
-    Vertex {
-        position: [-1.0, -1.0, 1.0, 1.0],
-        color: [0.0, 1.0, 0.0, 1.0],
-    },
-    Vertex {
-        position: [1.0, -1.0, 1.0, 1.0],
-        color: [0.0, 1.0, 0.0, 1.0],
-    },
-    Vertex {
-        position: [1.0, 1.0, 1.0, 1.0],
-        color: [0.0, 1.0, 0.0, 1.0],
-    },
-    Vertex {
-        position: [-1.0, 1.0, 1.0, 1.0],
-        color: [0.0, 1.0, 0.0, 1.0],
-    },
-    // bottom (0, 0, -1)
-    Vertex {
-        position: [-1.0, 1.0, -1.0, 1.0],
-        color: [0.0, 1.0, 0.0, 1.0],
-    },
-    Vertex {
-        position: [1.0, 1.0, -1.0, 1.0],
-        color: [0.0, 1.0, 0.0, 1.0],
-    },
-    Vertex {
-        position: [1.0, -1.0, -1.0, 1.0],
-        color: [0.0, 1.0, 0.0, 1.0],
-    },
-    Vertex {
-        position: [-1.0, -1.0, -1.0, 1.0],
-        color: [0.0, 1.0, 0.0, 1.0],
-    },
-    // right (1.0, 0, 0)
-    Vertex {
-        position: [1.0, -1.0, -1.0, 1.0],
-        color: [0.0, 0.0, 1.0, 1.0],
-    },
-    Vertex {
-        position: [1.0, 1.0, -1.0, 1.0],
-        color: [0.0, 0.0, 1.0, 1.0],
-    },
-    Vertex {
-        position: [1.0, 1.0, 1.0, 1.0],
-        color: [0.0, 0.0, 1.0, 1.0],
-    },
-    Vertex {
-        position: [1.0, -1.0, 1.0, 1.0],
-        color: [0.0, 0.0, 1.0, 1.0],
-    },
-    // left (-1.0, 0, 0)
-    Vertex {
-        position: [-1.0, -1.0, 1.0, 1.0],
-        color: [0.0, 0.0, 1.0, 1.0],
-    },
-    Vertex {
-        position: [-1.0, 1.0, 1.0, 1.0],
-        color: [0.0, 0.0, 1.0, 1.0],
-    },
-    Vertex {
-        position: [-1.0, 1.0, -1.0, 1.0],
-        color: [0.0, 0.0, 1.0, 1.0],
-    },
-    Vertex {
-        position: [-1.0, -1.0, -1.0, 1.0],
-        color: [0.0, 0.0, 1.0, 1.0],
-    },
-    // front (0, 1.0, 0)
-    Vertex {
-        position: [1.0, 1.0, -1.0, 1.0],
-        color: [1.0, 0.0, 0.0, 1.0],
-    },
-    Vertex {
-        position: [-1.0, 1.0, -1.0, 1.0],
-        color: [1.0, 0.0, 0.0, 1.0],
-    },
-    Vertex {
-        position: [-1.0, 1.0, 1.0, 1.0],
-        color: [1.0, 0.0, 0.0, 1.0],
-    },
-    Vertex {
-        position: [1.0, 1.0, 1.0, 1.0],
-        color: [1.0, 0.0, 0.0, 1.0],
-    },
-    // back (0, -1.0, 0)
-    Vertex {
-        position: [1.0, -1.0, 1.0, 1.0],
-        color: [1.0, 0.0, 0.0, 1.0],
-    },
-    Vertex {
-        position: [-1.0, -1.0, 1.0, 1.0],
-        color: [1.0, 0.0, 0.0, 1.0],
-    },
-    Vertex {
-        position: [-1.0, -1.0, -1.0, 1.0],
-        color: [1.0, 0.0, 0.0, 1.0],
-    },
-    Vertex {
-        position: [1.0, -1.0, -1.0, 1.0],
-        color: [1.0, 0.0, 0.0, 1.0],
-    },
-];
-
-#[rustfmt::skip]
-const INDICES: &[u16] = &[
-        0, 1, 2, 2, 3, 0, // top
-        4, 5, 6, 6, 7, 4, // bottom
-        8, 9, 10, 10, 11, 8, // right
-        12, 13, 14, 14, 15, 12, // left
-        16, 17, 18, 18, 19, 16, // front
-        20, 21, 22, 22, 23, 20, // back];
-];
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -174,7 +60,7 @@ pub struct State<'a, P: Projection> {
     pub time: Duration,
     pub last_frame: Instant,
     pub delta_time: f32,
-    pub mesh: Mesh<'a>,
+    pub mesh: Mesh,
 }
 
 impl<'a, P: Projection> State<'a, P> {
@@ -217,7 +103,8 @@ impl<'a, P: Projection> State<'a, P> {
             ))),
         });
 
-        let mesh = Mesh::new(VERTICES, INDICES);
+        let path = std::env::current_dir().unwrap().join("assets/teapot.obj");
+        let mesh = Mesh::from(path);
 
         let vertex_buffer =
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -229,8 +116,8 @@ impl<'a, P: Projection> State<'a, P> {
         let index_buffer =
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Index Buffer"),
-                contents: bytemuck::cast_slice(INDICES),
-                usage: wgpu::BufferUsages::INDEX,
+                contents: bytemuck::cast_slice(&mesh.indices),
+                usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
             });
 
         let config = surface
@@ -238,16 +125,11 @@ impl<'a, P: Projection> State<'a, P> {
             .unwrap();
 
         let camera = Camera::new(
-            45.0,
+            90.0,
             config.width as f32 / config.height as f32,
             projection_type,
-            Transform::from_translation(glam::Vec3::new(0.0, 0.0, 0.0)),
+            Transform::from_translation(glam::Vec3::new(0.0, 0.0, -10.0)),
         );
-        {
-            let cam = &camera;
-            let proj = cam.projection_matrix();
-            log::info!("{proj:?}");
-        }
 
         let mx_total = camera.projection_matrix();
         let mx_ref: &[f32; 16] = mx_total.as_ref();
@@ -389,6 +271,12 @@ impl<'a, P: Projection> State<'a, P> {
             bytemuck::cast_slice(&self.mesh.vertices_transformed()),
         );
 
+        self.queue.write_buffer(
+            &self.index_buffer,
+            0,
+            bytemuck::cast_slice(&self.mesh.indices),
+        );
+
         let delta_time = self.last_frame.elapsed();
         self.time += delta_time;
         self.last_frame = Instant::now();
@@ -442,7 +330,7 @@ impl<'a, P: Projection> State<'a, P> {
                 self.index_buffer.slice(..),
                 wgpu::IndexFormat::Uint16,
             );
-            render_pass.draw_indexed(0..INDICES.len() as u32, 0, 0..1);
+            render_pass.draw_indexed(0..self.mesh.indices.len() as u32, 0, 0..1);
         }
 
         self.queue.submit(Some(encoder.finish()));
