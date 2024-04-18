@@ -2,6 +2,7 @@
 use glam::Vec3;
 use rust_graphics::camera::{Camera, Perspective, Projection};
 use rust_graphics::mesh::Mesh;
+use rust_graphics::time;
 use rust_graphics::transform::Transform;
 use rust_graphics::Entity;
 use rust_graphics::{render::Render, Input};
@@ -13,7 +14,6 @@ use winit::{
     keyboard::PhysicalKey,
     window::Window,
 };
-use rust_graphics::time;
 
 use ::anyhow::Result;
 
