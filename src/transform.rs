@@ -6,7 +6,11 @@ pub struct Transform {
 }
 
 impl Transform {
-    pub fn new(translation: glam::Vec3, rotation: glam::Quat, scale: glam::Vec3) -> Self {
+    pub fn new(
+        translation: glam::Vec3,
+        rotation: glam::Quat,
+        scale: glam::Vec3,
+    ) -> Self {
         Transform {
             translation,
             rotation,

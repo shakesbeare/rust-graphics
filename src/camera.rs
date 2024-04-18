@@ -19,7 +19,6 @@ impl<P: Projection> Camera<P> {
         projection_type: P,
         transform: Transform,
     ) -> Self {
-        let dir = -transform.translation;
         Camera {
             proj: projection_type,
             transform,
@@ -37,7 +36,8 @@ impl<P: Projection> Camera<P> {
             self.pitch.cos() * self.yaw.sin(),
             self.pitch.sin(),
             self.pitch.cos() * self.yaw.cos(),
-        ).normalize()
+        )
+        .normalize()
     }
 
     pub fn backward(&self) -> glam::Vec3 {
@@ -93,7 +93,7 @@ pub struct Orthographic;
 
 impl Projection for Orthographic {
     fn generate_view_projection_matrix(
-        aspect_ratio: f32,
+        _aspect_ratio: f32,
         eye: glam::Vec3,
         up: glam::Vec3,
         fov: f32,
